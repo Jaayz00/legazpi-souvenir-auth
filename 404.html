@@ -348,15 +348,11 @@
     <div id="alertBox" class="alert"></div>
 
     <form id="resetForm" onsubmit="handleFormSubmit(event)">
-      <!-- Dynamic inputs for email/code if opened without session -->
+      <!-- Dynamic inputs for email if opened without session -->
       <div id="manualFields" style="display: none;">
         <div class="form-group">
           <label for="emailInput">Registered Email</label>
           <input type="email" id="emailInput" placeholder="name@example.com" autocomplete="email">
-        </div>
-        <div class="form-group">
-          <label for="codeInput">6-Digit Verification Code</label>
-          <input type="text" id="codeInput" maxlength="6" placeholder="123456" inputmode="numeric" style="letter-spacing: 6px; font-weight: 700; text-align: center; font-size: 18px;">
         </div>
       </div>
 
@@ -417,7 +413,6 @@
 
     let accessToken = null;
     let urlEmail = null;
-    let urlCode = null;
 
     function parseTokens() {
       // 1. Check URL fragment/hash for Supabase Auth recovery tokens (#access_token=...&type=recovery)
@@ -427,13 +422,12 @@
         accessToken = hashParams.get('access_token');
       }
 
-      // 2. Check query params (?email=...&code=... or ?token=...)
+      // 2. Check query params (?email=... or ?token=...)
       const queryParams = new URLSearchParams(window.location.search);
       if (!accessToken) {
         accessToken = queryParams.get('access_token') || queryParams.get('token');
       }
       urlEmail = queryParams.get('email');
-      urlCode = queryParams.get('code');
     }
 
     function initPage() {
@@ -441,7 +435,6 @@
 
       const manualFields = document.getElementById('manualFields');
       const emailInput = document.getElementById('emailInput');
-      const codeInput = document.getElementById('codeInput');
 
       if (accessToken) {
         manualFields.style.display = 'none';
@@ -450,14 +443,9 @@
         manualFields.style.display = 'block';
         if (urlEmail) {
           emailInput.value = urlEmail;
-        }
-        if (urlCode) {
-          codeInput.value = urlCode;
-        }
-        if (urlEmail && urlCode) {
-          showAlert('Verification code loaded for ' + urlEmail + '. Please choose your new password.', 'info');
+          showAlert('Resetting password for ' + urlEmail + '. Please enter and confirm your new password below.', 'info');
         } else {
-          showAlert('Please enter your registered email and the 6-digit recovery code from your email.', 'info');
+          showAlert('Please enter your registered email and choose a new password below.', 'info');
         }
       }
 
@@ -486,7 +474,6 @@
     const confirmPass = document.getElementById('confirmPass');
     const submitBtn = document.getElementById('submitBtn');
     const emailInput = document.getElementById('emailInput');
-    const codeInput = document.getElementById('codeInput');
 
     function checkValidations() {
       const p = newPass.value;
@@ -523,8 +510,7 @@
       let manualOk = true;
       if (!accessToken) {
         const em = emailInput.value.trim();
-        const cd = codeInput.value.trim();
-        manualOk = em.length > 3 && cd.length === 6;
+        manualOk = em.length > 3 && em.includes('@');
       }
 
       submitBtn.disabled = !(allPwOk && manualOk);
@@ -542,7 +528,6 @@
     newPass.addEventListener('input', checkValidations);
     confirmPass.addEventListener('input', checkValidations);
     emailInput.addEventListener('input', checkValidations);
-    codeInput.addEventListener('input', checkValidations);
 
     async function handleFormSubmit(e) {
       e.preventDefault();
@@ -573,21 +558,20 @@
           }
         } else {
           const email = emailInput.value.trim().toLowerCase();
-          const code = codeInput.value.trim();
-          const res = await fetch(SUPABASE_URL + '/functions/v1/auth/reset-password-mfa', {
+          const res = await fetch(SUPABASE_URL + '/functions/v1/auth/reset-password', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'apikey': ANON_KEY
             },
-            body: JSON.stringify({ email, code, newPassword: password })
+            body: JSON.stringify({ email, newPassword: password })
           });
 
           const data = await res.json().catch(() => ({}));
           if (res.ok) {
             success = true;
           } else {
-            throw new Error(data.error || 'Failed to verify verification code or update password.');
+            throw new Error(data.error || 'Failed to update password. Please check your email and try again.');
           }
         }
 
@@ -600,7 +584,7 @@
       } catch (err) {
         showAlert(err.message || 'An error occurred while resetting your password.', 'error');
         submitBtn.disabled = false;
-        submitBtn.innerText = 'Reset Password';
+        submitBtn.innerHTML = '<span>Reset Password</span>';
       }
     }
 
